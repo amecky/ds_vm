@@ -1,0 +1,9 @@
+Debug/
+.vs/ds_vm/v14/.suo
+test.c
+test.exe
+test.obj
+ds_vm.sdf
+ds_vm.ppj
+ds_vm.ppx
+ds_vm.tag
