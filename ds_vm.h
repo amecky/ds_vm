@@ -192,8 +192,8 @@ uint16_t vm__buffer_append(CharBuffer* buffer, char s) {
 static float vm__pop(VMStack* stack) { return stack->data[--stack->size]; }
 static void vm__push(VMStack* stack, float f) { stack->data[stack->size++] = f; }
 
-static uint16_t vm__add_name() {
-
+static uint16_t vm__add_name(Context* ctx, const char* name) {
+	return vm__buffer_append(&ctx->names, name, strlen(name));
 }
 
 uint16_t vm_add_variable(Context* ctx, const char* name, float value) {
@@ -273,7 +273,6 @@ Context* vm_create_context() {
 	ctx->names.capacity = 0;
 	ctx->names.num = 0;
 	vm__buffer_alloc(&ctx->names, 128);
-	//ctx->names.alloc(128);
 	add_function(ctx, ",", vm_no_op, 1, 0);
 	add_function(ctx, "+", vm_add, 12, 2);
 	add_function(ctx, "-", vm_sub, 12, 2);
@@ -288,8 +287,6 @@ Context* vm_create_context() {
 }
 
 void vm_destroy_context(Context* ctx) {
-	// FIXME: clean up everything
-	VM_FREE(ctx->functions);
 	VM_FREE(ctx->names.data);
 	VM_FREE(ctx);
 }
@@ -410,9 +407,9 @@ static int vm__is_whitespace(const char c) {
 // ------------------------------------------------------------------
 // get token for identifier
 // ------------------------------------------------------------------
-static VMToken token_for_identifier(const char *identifier, unsigned len, Context* ctx) {
+static VMToken token_for_identifier(Context* ctx, const char *identifier, unsigned len) {
 	uint16_t i;
-	char tmp[256];
+	char tmp[256];	
 	const char* p = identifier;
 	int l = 0;
 	while (l < len) {
@@ -450,13 +447,6 @@ static VMToken token_for_identifier(const char *identifier, unsigned len, Contex
 // ------------------------------------------------------------------
 // get token for identifier
 // ------------------------------------------------------------------
-static VMToken token_for_identifier(const char *identifier, Context* ctx) {
-	return token_for_identifier(identifier, strlen(identifier), ctx);
-}
-
-// ------------------------------------------------------------------
-// get token for identifier
-// ------------------------------------------------------------------
 /*
 static VMToken token_for_identifier(Context* ctx, const char *identifier, unsigned len) {
 	uint16_t i;
@@ -486,12 +476,7 @@ static VMToken token_for_identifier(Context* ctx, const char *identifier, unsign
 	}
 }
 */
-// ------------------------------------------------------------------
-// get token for identifier
-// ------------------------------------------------------------------
-static VMToken token_for_identifier(Context* ctx, const char *identifier) {
-	return token_for_identifier(ctx, identifier, strlen(identifier));
-}
+
 
 // ------------------------------------------------------------------
 // has function
@@ -561,15 +546,18 @@ struct FunctionVMStackItem_t {
 
 typedef struct FunctionVMStackItem_t FunctionVMStackItem;
 
-static int cmp(FunctionVMStackItem f) {
-	if (par_level != f.par_level) return par_level - f.par_level;
-	return precedence - f.precedence;
+static int cmp(FunctionVMStackItem t,FunctionVMStackItem f) {
+	if (t.par_level != f.par_level) return t.par_level - f.par_level;
+	return t.precedence - f.precedence;
 }
-inline bool operator<(const FunctionVMStackItem &other) const { return cmp(other) < 0; }
-inline bool operator<=(const FunctionVMStackItem &other) const { return cmp(other) <= 0; }
-inline bool operator==(const FunctionVMStackItem &other) const { return cmp(other) == 0; }
-inline bool operator>=(const FunctionVMStackItem &other) const { return cmp(other) >= 0; }
-inline bool operator>(const FunctionVMStackItem &other) const { return cmp(other) > 0; }
+
+//function_stack[num_function_stack - 1] >= f
+
+//inline bool operator<(const FunctionVMStackItem &other) const { return cmp(other) < 0; }
+//inline bool operator<=(const FunctionVMStackItem &other) const { return cmp(other) <= 0; }
+//inline bool operator==(const FunctionVMStackItem &other) const { return cmp(other) == 0; }
+//inline int operator>=(FunctionVMStackItem  t,FunctionVMStackItem other) { return cmp(t,other) >= 0; }
+//inline bool operator>(const FunctionVMStackItem &other) const { return cmp(other) > 0; }
 
 // -------------------------------------------------------
 // random
@@ -597,12 +585,14 @@ float random(float min, float max) {
 
 VMToken vm__create_token(VMTokenType type) {
 	VMToken t;
+	printf("creating token: %d\n", type);
 	t.type = type;
 	t.value = 0.0f;
 	return t;
 }
 
-VMToken vm__create_token(VMTokenType type, float value) {
+VMToken vm__create_token_with_value(VMTokenType type, float value) {
+	printf("creating token with value %g\n", value);
 	VMToken t;
 	t.type = type;
 	t.value = value;
@@ -611,7 +601,7 @@ VMToken vm__create_token(VMTokenType type, float value) {
 // ------------------------------------------------------------------
 // parse
 // ------------------------------------------------------------------
-uint16_t vm_parse(const char * source, Context* ctx, VMToken * byteCode, uint16_t capacity) {
+uint16_t vm_parse(Context* ctx, const char * source, VMToken * byteCode, uint16_t capacity) {
 	printf("source: '%s'\n", source);
 	int binary = 0;
 	const char* p = source;
@@ -619,10 +609,11 @@ uint16_t vm_parse(const char * source, Context* ctx, VMToken * byteCode, uint16_
 	unsigned overflow_tokens = 0;
 	VMToken* tokens = (VMToken*)VM_MALLOC(capacity * sizeof(VMToken));
 	while (*p != 0) {
-		VMToken token;// (Token::EMPTY);
+		VMToken token;
+		token.type = TOK_EMPTY;
 		if (*p >= '0' && *p <= '9') {
 			char *out;
-			token = vm__create_token(TOK_NUMBER, vm__strtof(p, &out));
+			token = vm__create_token_with_value(TOK_NUMBER, vm__strtof(p, &out));
 			p = out;
 			binary = 1;
 		}
@@ -630,29 +621,31 @@ uint16_t vm_parse(const char * source, Context* ctx, VMToken * byteCode, uint16_
 			const char *identifier = p;
 			while ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p == '_') || (*p >= '0' && *p <= '9'))
 				p++;
-			token = token_for_identifier(identifier, p - identifier, ctx);
+			token = token_for_identifier(ctx, identifier, p - identifier);
 			binary = 1;
 		}
 		else {
+			printf("p: '%c'\n", *p);
 			switch (*p) {
-			case '(': token = vm__create_token(TOK_LEFT_PARENTHESIS); binary = 0; break;
-			case ')': token = vm__create_token(TOK_RIGHT_PARENTHESIS); binary = 1; break;
-			case ' ': case '\t': case '\n': case '\r': break;
-			case '-': token = token_for_identifier(binary ? "-" : "u-", ctx); binary = 0; break;
-			case '+': token = token_for_identifier(binary ? "+" : "u+", ctx); binary = 0; break;
-			default: {
-				char s1[2] = { *p,0 };
-				char s2[3] = { *p, *(p + 1), 0 };
-				if (s2[1] && has_function(&ctx, s2)) {
-					token = token_for_identifier(s2, ctx);
-					++p;
+				case '(': token = vm__create_token(TOK_LEFT_PARENTHESIS); binary = 0; break;
+				case ')': token = vm__create_token(TOK_RIGHT_PARENTHESIS); binary = 1; break;
+				case ' ': case '\t': case '\n': case '\r': break;
+				case '-': token = token_for_identifier(ctx, binary ? "-" : "u-", 1 + binary); binary = 0; break;
+				case '+': token = token_for_identifier(ctx, binary ? "+" : "u+", 1 + binary); binary = 0; break;
+				default: {
+					char s1[2] = { *p,0 };
+					char s2[3] = { *p, *(p + 1), 0 };
+					printf("s1 %s s2 %s\n", s1, s2);
+					if (s2[1] && has_function(ctx, s2)) {
+						token = token_for_identifier(ctx, s2,2);
+						++p;
+					}
+					else {
+						token = token_for_identifier(ctx, s1, 1);
+					}
+					binary = 0;
+					break;
 				}
-				else {
-					token = token_for_identifier(s1, ctx);
-				}
-				binary = 0;
-				break;
-			}
 			}
 			++p;
 		}
@@ -674,23 +667,26 @@ uint16_t vm_parse(const char * source, Context* ctx, VMToken * byteCode, uint16_
 	for (unsigned i = 0; i<num_tokens; ++i) {
 		VMToken token = tokens[i];
 		switch (token.type) {
-		case TOK_NUMBER:
-		case TOK_VARIABLE:
-			byteCode[num_rpl++] = token;
-			break;
-		case TOK_LEFT_PARENTHESIS:
-			++par_level;
-			break;
-		case TOK_RIGHT_PARENTHESIS:
-			--par_level;
-			break;
-		case TOK_FUNCTION: {
-			FunctionVMStackItem f(token, ctx.functions[token.id].precedence, par_level);
-			while (num_function_stack>0 && function_stack[num_function_stack - 1] >= f)
-				byteCode[num_rpl++] = function_stack[--num_function_stack].token;
-			function_stack[num_function_stack++] = f;
-			break;
-		}
+			case TOK_NUMBER:
+			case TOK_VARIABLE:
+				byteCode[num_rpl++] = token;
+				break;
+			case TOK_LEFT_PARENTHESIS:
+				++par_level;
+				break;
+			case TOK_RIGHT_PARENTHESIS:
+				--par_level;
+				break;
+			case TOK_FUNCTION: {
+				FunctionVMStackItem f;
+				f.token = token;
+				f.precedence = ctx->functions[token.id].precedence;
+				f.par_level = par_level;
+				while (num_function_stack>0 && cmp(function_stack[num_function_stack - 1],f) >= 0)
+					byteCode[num_rpl++] = function_stack[--num_function_stack].token;
+				function_stack[num_function_stack++] = f;
+				break;
+			}
 		}
 	}
 
@@ -961,7 +957,7 @@ float vm_run(VMToken* byteCode, uint16_t capacity, Context* ctx, const char* res
 	}
 	float r = 0.0f;
 	if (stack.size > 0) {
-		r = VM_POP(stack);
+		r = VM_POP(&stack);
 	}
 	if (result_name != 0) {
 		uint16_t id = find_variable(result_name, strlen(result_name), ctx);
