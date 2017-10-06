@@ -86,29 +86,20 @@ void testSimpleExpression() {
 	vm_add_variable(ctx, "TEST", 4.0f);
 	vm_token tokens[64];
 	uint16_t ret = vm_parse(ctx, "2 + 4 + TEST", tokens, 64);
-	printf("num: %d\n", ret);
-	for (int i = 0; i < ret; ++i) {
-		if (tokens[i].type == TOK_FUNCTION) {
-			printf("%d = function(%d) / %d\n", i, tokens[i].type, tokens[i].id);
-		}
-		else {
-			printf("%d = variable(%d) / %d %g\n", i, tokens[i].type, tokens[i].id, tokens[i].value);
-		}
-	}
 	float r = 0.0f;
 	if (vm_run(ctx, tokens, ret, &r) == 0) {
 		printf("result: %g\n", r);
 	}
 	else {
-		printf("Error\n");
+		printf("Error: %s\n", vm_get_error(code));
 	}
 	vm_destroy_context(ctx);
 }
 
 int main() {
-	//testFunction();
+	testFunction();
 	testAddFunction();
-	//testSimpleExpression();
-	//testSetVar();
-	//testWrongMethod();
+	testSimpleExpression();
+	testSetVar();
+	testWrongMethod();
 }
