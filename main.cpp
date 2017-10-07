@@ -8,98 +8,85 @@ void test_method(vm_stack* stack) {
 	VM_PUSH(stack, (a+b)*10);
 }
 
-void print_bytecode(vm_token* tokens, uint16_t num) {
-	printf("bytecode: \n");
-	for (uint16_t i = 0; i < num; ++i) {
-		printf("%d : %d %d %g\n", i, tokens[i].type, tokens[i].id,tokens[i].value);
+int assertEquals(vm_context* ctx, vm_token* tokens, uint16_t num, float expected) {
+	float r = 0.0f;
+	uint16_t code = vm_run(ctx, tokens, num, &r);
+	if (code == 0) {
+		float d = expected - r;
+		if (d < 0.0f) {
+			d *= -1.0f;
+		}
+		if (d > 0.0001f) {
+			printf("Error: expected: %g but got %g\n", expected, r);
+			return 0;
+		}
 	}
+	else {
+		printf("Error: %s\n", vm_get_error(code));
+		return 0;
+	}
+	return 1;
 }
 
-void testAddFunction() {
-	printf("testAddFunction\n");
-	vm_context* ctx = vm_create_context();
+typedef int(*testFunction)(vm_context*);
+
+int test_add_function(vm_context* ctx) {
 	vm_add_function(ctx, "FOO", test_method, 17, 2);
 	vm_token tokens[64];
 	uint16_t ret = vm_parse(ctx, "2 + FOO(10,20)", tokens, 64);
-	float r = 0.0f;
-	uint16_t code = vm_run(ctx, tokens, ret, &r);
-	if (code == 0) {
-		printf("result: %g\n", r);
-	}
-	else {
-		printf("Error: %s\n", vm_get_error(code));
-	}
-	vm_destroy_context(ctx);
+	return assertEquals(ctx, tokens, ret, 302.0f);
 }
 
-void testWrongMethod() {
-	printf("testWrongMethod\n");
-	vm_context* ctx = vm_create_context();
+int test_lerp_function(vm_context* ctx) {
 	vm_token tokens[64];
-	uint16_t ret = vm_parse(ctx, "2 + sin(2,3)", tokens, 64);
-	float r = 0.0f;
-	uint16_t code = vm_run(ctx, tokens, ret, &r);
-	if (code == 0) {
-		printf("result: %g\n", r);
-	}
-	else {
-		printf("Error: %s\n",vm_get_error(code));
-	}
-	vm_destroy_context(ctx);
+	uint16_t ret = vm_parse(ctx, "2 + lerp(4,8,0.25)", tokens, 64);
+	return assertEquals(ctx, tokens, ret, 7.0f);
 }
 
-void testFunction() {
-	printf("testFunction\n");
-	vm_context* ctx = vm_create_context();
+int test_abs_function(vm_context* ctx) {
 	vm_token tokens[64];
 	uint16_t ret = vm_parse(ctx, "2 + abs(-2)", tokens, 64);
-	float r = 0.0f;
-	uint16_t code = vm_run(ctx, tokens, ret, &r);
-	if (code == 0) {
-		printf("result: %g\n", r);
-	}
-	else {
-		printf("Error: %s\n", vm_get_error(code));
-	}
-	vm_destroy_context(ctx);
+	return assertEquals(ctx, tokens, ret, 4.0f);
 }
 
-void testSetVar() {
-	printf("testSetVar\n");
-	vm_context* ctx = vm_create_context();
+int test_variable(vm_context* ctx) {
 	vm_add_variable(ctx, "TEST", 4.0f);
 	vm_token tokens[64];
 	uint16_t ret = vm_parse(ctx, "2 + 4 + TEST", tokens, 64);
-	float r = 0.0f;
-	vm_run(ctx, tokens, ret, &r);
-	printf("result: %g\n", r);
-	vm_set_variable(ctx, "TEST", 20.0f);
-	r = 0.0f;
-	vm_run(ctx, tokens, ret, &r);
-	printf("result: %g\n", r);
-	vm_destroy_context(ctx);
+	return assertEquals(ctx, tokens, ret, 10.0f);
 }
 
-void testSimpleExpression() {
-	printf("testSimpleExpression\n");
-	vm_context* ctx = vm_create_context();
-	vm_add_variable(ctx, "TEST", 4.0f);
+int test_unknown_variable(vm_context* ctx) {
+	vm_add_variable(ctx, "DUMMY", 4.0f);
 	vm_token tokens[64];
 	uint16_t ret = vm_parse(ctx, "2 + 4 + TEST", tokens, 64);
-	float r = 0.0f;
-	if (vm_run(ctx, tokens, ret, &r) == 0) {
-		printf("result: %g\n", r);
+	return assertEquals(ctx, tokens, ret, 6.0f);
+}
+
+int test_basic_expression(vm_context* ctx) {
+	vm_token tokens[64];
+	uint16_t ret = vm_parse(ctx, "10 + ( 4 * 3 + 8 / 2)", tokens, 64);
+	return assertEquals(ctx, tokens, ret, 26.0f);
+}
+
+void run_test(testFunction func, const char* method) {
+	printf("executing '%s'\n", method);
+	vm_context* ctx = vm_create_context();
+	int ret = (func)(ctx);
+	if (ret == 0) {
+		printf("=> FALSE\n");
 	}
 	else {
-		printf("Error: %s\n", vm_get_error(code));
+		printf("=> OK\n");
 	}
 	vm_destroy_context(ctx);
 }
 
 int main() {
-	testFunction();
-	testAddFunction();
-	testSimpleExpression();
-	testSetVar();
-	testWrongMethod();
+	run_test(test_basic_expression, "test_basic_expression");
+	run_test(test_add_function, "test_add_function");
+	run_test(test_lerp_function, "test_lerp_function");
+	run_test(test_abs_function, "test_abs_function");
+	run_test(test_variable, "test_variable");
+	run_test(test_unknown_variable, "test_unknown_variable");
 }
