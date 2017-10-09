@@ -14,9 +14,9 @@
 
 	vm_context* ctx = vm_create_context();
 	vm_token tokens[64];
-	uint16_t ret = vm_parse(ctx, "10 + ( 4 * 3 + 8 / 2)", tokens, 64);
+	int ret = vm_parse(ctx, "10 + ( 4 * 3 + 8 / 2)", tokens, 64);
 	float r = 0.0f;
-	uint16_t code = vm_run(ctx, tokens, num, &r);
+	int code = vm_run(ctx, tokens, num, &r);
 	if (code == 0) {
 		printf("Result: %g\n", r);
 	}
@@ -39,7 +39,6 @@
 
 #ifndef DS_VM_INCLUDE_H
 #define DS_VM_INCLUDE_H
-#include <stdint.h>
 #include <stdlib.h>
 
 #ifndef VM_MALLOC
@@ -59,8 +58,8 @@ extern "C" {
 
 	struct vm_stack_t {
 		float* data;
-		uint16_t size;
-		uint16_t capacity;
+		int size;
+		int capacity;
 	};
 
 	typedef struct vm_stack_t vm_stack;
@@ -72,7 +71,7 @@ extern "C" {
 	struct vm_token_t {
 		vm_token_type type;
 		union {
-			uint16_t id;
+			int id;
 			float value;
 		};
 	};
@@ -80,27 +79,27 @@ extern "C" {
 	typedef struct vm_token_t vm_token;
 
 	struct vm_variable_t {
-		uint32_t hash;
+		int hash;
 		float value;
 	};
 
 	typedef struct vm_variable_t vm_variable;
 
 	struct vm_function_t {
-		uint32_t hash;
+		int hash;
 		vmFunction function;
-		uint8_t precedence;
-		uint8_t num_parameters;
+		int precedence;
+		int num_parameters;
 	};
 
 	typedef struct vm_function_t vm_function;
 
 	struct vm_context_t {
 
-		uint16_t num_variables;
+		int num_variables;
 		vm_variable variables[32];
 		vm_function functions[32];
-		uint16_t num_functions;
+		int num_functions;
 
 	};
 
@@ -108,21 +107,21 @@ extern "C" {
 
 	DSDEF vm_context* vm_create_context();
 
-	DSDEF uint16_t vm_add_variable(vm_context* ctx, const char* name, float value);
+	DSDEF int vm_add_variable(vm_context* ctx, const char* name, float value);
 
 	DSDEF void vm_set_variable(vm_context* ctx, const char* name, float value);
 
-	DSDEF void vm_add_function(vm_context* ctx, const char* name, vmFunction func, uint8_t precedence, uint8_t num_params);
+	DSDEF void vm_add_function(vm_context* ctx, const char* name, vmFunction func, int precedence, int num_params);
 
-	DSDEF uint16_t vm_parse(vm_context* ctx, const char* source, vm_token* tokens, uint16_t capacity);
+	DSDEF int vm_parse(vm_context* ctx, const char* source, vm_token* tokens, int capacity);
 
-	DSDEF uint16_t vm_run(vm_context* ctx, vm_token* byteCode, uint16_t capacity, float* ret);
+	DSDEF int vm_run(vm_context* ctx, vm_token* byteCode, int capacity, float* ret);
 
-	DSDEF void vm_debug(vm_token* tokens, uint16_t num);
+	DSDEF void vm_debug(vm_token* tokens, int num);
 
 	DSDEF void vm_destroy_context(vm_context* ctx);
 
-	DSDEF const char* vm_get_error(uint16_t code);
+	DSDEF const char* vm_get_error(int code);
 
 #ifdef __cplusplus
 }
@@ -133,7 +132,7 @@ extern "C" {
 #ifdef DS_VM_IMPLEMENTATION
 
 struct vm_error_code_t {
-	uint16_t code;
+	int code;
 	const char* message;
 };
 
@@ -147,15 +146,15 @@ const static vm_error_code ERRORS[] = {
 
 const char* TOKEN_NAMES[] = { "TOK_EMPTY", "TOK_NUMBER", "TOK_FUNCTION", "TOK_VARIABLE", "TOK_LEFT_PARENTHESIS", "TOK_RIGHT_PARENTHESIS" };
 
-const uint32_t FNV_Prime = 0x01000193; //   16777619
-const uint32_t FNV_Seed = 0x811C9DC5; // 2166136261
+const int FNV_Prime = 0x01000193; //   16777619
+const int FNV_Seed = 0x811C9DC5; // 2166136261
 
 // ------------------------------------------------------------------
 // internal method to generate hash
 // ------------------------------------------------------------------
-static inline uint32_t vm__fnv1a(const char* text) {
+static inline int vm__fnv1a(const char* text) {
 	const unsigned char* ptr = (const unsigned char*)text;
-	uint32_t hash = FNV_Seed;
+	int hash = FNV_Seed;
 	while (*ptr) {
 		hash = (*ptr++ ^ hash) * FNV_Prime;
 	}
@@ -165,7 +164,7 @@ static inline uint32_t vm__fnv1a(const char* text) {
 // ------------------------------------------------------------------
 // get error message by code
 // ------------------------------------------------------------------
-DSDEF const char* vm_get_error(uint16_t code) {
+DSDEF const char* vm_get_error(int code) {
 	return ERRORS[code].message;
 }
 
@@ -180,21 +179,21 @@ static void vm__push(vm_stack* stack, float f) { stack->data[stack->size++] = f;
 // ------------------------------------------------------------------
 // internal method to build hash from string
 // ------------------------------------------------------------------
-static uint32_t vm__build_hash(const char* v, uint16_t len) {
-	uint16_t l = 0;
+static int vm__build_hash(const char* v, int len) {
+	int l = 0;
 	char tmp[256];
-	for (uint16_t i = 0; i < len; ++i) {
+	for (int i = 0; i < len; ++i) {
 		tmp[l++] = v[i];
 	}
 	tmp[l] = '\0';
-	uint32_t r = vm__fnv1a(tmp);
+	int r = vm__fnv1a(tmp);
 	return r;
 }
 
 // ------------------------------------------------------------------
 // add new variable to vm_context
 // ------------------------------------------------------------------
-DSDEF uint16_t vm_add_variable(vm_context* ctx, const char* name, float value) {
+DSDEF int vm_add_variable(vm_context* ctx, const char* name, float value) {
 	vm_variable* v = &ctx->variables[ctx->num_variables++];
 	v->hash = vm__fnv1a(name);
 	v->value = value;
@@ -205,8 +204,8 @@ DSDEF uint16_t vm_add_variable(vm_context* ctx, const char* name, float value) {
 // set value of variable
 // ------------------------------------------------------------------
 DSDEF void vm_set_variable(vm_context* ctx, const char* name, float value) {
-	uint32_t h = vm__fnv1a(name);
-	for (uint16_t i = 0; i < ctx->num_variables; ++i) {
+	int h = vm__fnv1a(name);
+	for (int i = 0; i < ctx->num_variables; ++i) {
 		if (ctx->variables[i].hash == h) {
 			ctx->variables[i].value = value;
 		}
@@ -216,7 +215,7 @@ DSDEF void vm_set_variable(vm_context* ctx, const char* name, float value) {
 // ------------------------------------------------------------------
 // internal method to add a new variable
 // ------------------------------------------------------------------
-static uint16_t vm__add_variable(vm_context* ctx, const char* name, int length, float value) {
+static int vm__add_variable(vm_context* ctx, const char* name, int length, float value) {
 	vm_variable* v = &ctx->variables[ctx->num_variables++];
 	v->hash = vm__build_hash(name, length);
 	v->value = value;
@@ -226,7 +225,7 @@ static uint16_t vm__add_variable(vm_context* ctx, const char* name, int length, 
 // ------------------------------------------------------------------
 // add function to vm_context
 // ------------------------------------------------------------------
-DSDEF void vm_add_function(vm_context* ctx, const char* name, vmFunction func, uint8_t precedence, uint8_t num_params) {
+DSDEF void vm_add_function(vm_context* ctx, const char* name, vmFunction func, int precedence, int num_params) {
 	vm_function* f = &ctx->functions[ctx->num_functions++];
 	f->hash = vm__fnv1a(name);
 	f->function = func;
@@ -309,27 +308,27 @@ DSDEF void vm_destroy_context(vm_context* ctx) {
 // ------------------------------------------------------------------
 // internal method to find a variable
 // ------------------------------------------------------------------
-static uint16_t vm__find_variable(const char *s, uint16_t len, vm_context* ctx) {
-	uint32_t h = vm__build_hash(s, len);
-	for (uint16_t i = 0; i < ctx->num_variables; ++i) {
+static int vm__find_variable(const char *s, int len, vm_context* ctx) {
+	int h = vm__build_hash(s, len);
+	for (int i = 0; i < ctx->num_variables; ++i) {
 		if ( ctx->variables[i].hash == h) {
 			return i;
 		}
 	}
-	return UINT16_MAX;
+	return -1;
 }
 
 // ------------------------------------------------------------------
 // internal method to find a function
 // ------------------------------------------------------------------
-static uint16_t vm__find_function(vm_context* ctx, const char *s, uint16_t len) {
-	uint32_t h = vm__build_hash(s, len);
-	for (uint16_t i = 0; i < ctx->num_functions; ++i) {
+static int vm__find_function(vm_context* ctx, const char *s, int len) {
+	int h = vm__build_hash(s, len);
+	for (int i = 0; i < ctx->num_functions; ++i) {
 		if ( h == ctx->functions[i].hash) {
 			return i;
 		}
 	}
-	return UINT16_MAX;
+	return -1;
 }
 
 // ------------------------------------------------------------------
@@ -356,14 +355,14 @@ static int vm__is_whitespace(const char c) {
 // get token for identifier
 // ------------------------------------------------------------------
 static vm_token vm__token_for_identifier(vm_context* ctx, const char *identifier, unsigned len) {
-	uint16_t i;
-	if ((i = vm__find_variable(identifier, len, ctx)) != UINT16_MAX) {
+	int i;
+	if ((i = vm__find_variable(identifier, len, ctx)) != -1) {
 		vm_token t;
 		t.type = TOK_VARIABLE;
 		t.id = i;
 		return t;
 	}
-	else if ((i = vm__find_function(ctx, identifier, len)) != UINT16_MAX) {
+	else if ((i = vm__find_function(ctx, identifier, len)) != -1) {
 		vm_token t;
 		t.type = TOK_FUNCTION;
 		t.id = i;
@@ -388,7 +387,7 @@ static vm_token vm__token_for_identifier(vm_context* ctx, const char *identifier
 // internal method to check wether there is a known function
 // ------------------------------------------------------------------
 static int vm__has_function(vm_context* ctx, char * identifier) {
-	if (vm__find_function(ctx, identifier, strlen(identifier)) != UINT16_MAX) {
+	if (vm__find_function(ctx, identifier, strlen(identifier)) != -1) {
 		return 1;
 	}
 	return 0;
@@ -473,7 +472,7 @@ vm_token vm__create_token_with_value(vm_token_type type, float value) {
 // ------------------------------------------------------------------
 // parse
 // ------------------------------------------------------------------
-DSDEF uint16_t vm_parse(vm_context* ctx, const char * source, vm_token * byteCode, uint16_t capacity) {
+DSDEF int vm_parse(vm_context* ctx, const char * source, vm_token * byteCode, int capacity) {
 	int binary = 1;
 	const char* p = source;
 	unsigned num_tokens = 0;
@@ -527,7 +526,7 @@ DSDEF uint16_t vm_parse(vm_context* ctx, const char * source, vm_token * byteCod
 		}
 	}
 
-	uint16_t num_rpl = 0;
+	int num_rpl = 0;
 	FunctionVMStackItem function_stack[256];
 
 	unsigned num_function_stack = 0;
@@ -570,10 +569,10 @@ DSDEF uint16_t vm_parse(vm_context* ctx, const char * source, vm_token * byteCod
 // ------------------------------------------------------------------
 // run
 // ------------------------------------------------------------------
-DSDEF uint16_t vm_run(vm_context* ctx, vm_token* byteCode, uint16_t capacity, float* ret) {
+DSDEF int vm_run(vm_context* ctx, vm_token* byteCode, int capacity, float* ret) {
 	float stack_data[32] = { 0.0f };
 	vm_stack stack = { stack_data, 0, 32 };
-	for (uint16_t i = 0; i < capacity; ++i) {
+	for (int i = 0; i < capacity; ++i) {
 		if (byteCode[i].type == TOK_NUMBER) {
 			VM_PUSH(&stack,byteCode[i].value);
 		}
@@ -581,7 +580,7 @@ DSDEF uint16_t vm_run(vm_context* ctx, vm_token* byteCode, uint16_t capacity, fl
 			VM_PUSH(&stack,ctx->variables[byteCode[i].id].value);
 		}
 		else if (byteCode[i].type == TOK_FUNCTION) {
-			uint16_t id = byteCode[i].id;
+			int id = byteCode[i].id;
 			vm_function f = ctx->functions[id];
 			if (stack.size >= f.num_parameters) {
 				(f.function)(&stack);
@@ -598,9 +597,9 @@ DSDEF uint16_t vm_run(vm_context* ctx, vm_token* byteCode, uint16_t capacity, fl
 	return 1;
 }
 
-DSDEF void vm_debug(vm_token* tokens, uint16_t num) {
+DSDEF void vm_debug(vm_token* tokens, int num) {
 	printf("bytecode: \n");
-	for (uint16_t i = 0; i < num; ++i) {
+	for (int i = 0; i < num; ++i) {
 		printf("%d : %s %d %g\n", i, TOKEN_NAMES[tokens[i].type], tokens[i].id, tokens[i].value);
 	}
 }

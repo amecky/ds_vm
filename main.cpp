@@ -1,5 +1,6 @@
 #include <stdio.h>
 #define DS_VM_IMPLEMENTATION
+#define DS_VM_STATIC
 #include "ds_vm.h"
 
 void test_method(vm_stack* stack) {
@@ -8,9 +9,9 @@ void test_method(vm_stack* stack) {
 	VM_PUSH(stack, (a+b)*10);
 }
 
-int assertEquals(vm_context* ctx, vm_token* tokens, uint16_t num, float expected) {
+int assertEquals(vm_context* ctx, vm_token* tokens, int num, float expected) {
 	float r = 0.0f;
-	uint16_t code = vm_run(ctx, tokens, num, &r);
+	int code = vm_run(ctx, tokens, num, &r);
 	if (code == 0) {
 		float d = expected - r;
 		if (d < 0.0f) {
@@ -33,39 +34,39 @@ typedef int(*testFunction)(vm_context*);
 int test_add_function(vm_context* ctx) {
 	vm_add_function(ctx, "FOO", test_method, 17, 2);
 	vm_token tokens[64];
-	uint16_t ret = vm_parse(ctx, "2 + FOO(10,20)", tokens, 64);
+	int ret = vm_parse(ctx, "2 + FOO(10,20)", tokens, 64);
 	return assertEquals(ctx, tokens, ret, 302.0f);
 }
 
 int test_lerp_function(vm_context* ctx) {
 	vm_token tokens[64];
-	uint16_t ret = vm_parse(ctx, "2 + lerp(4,8,0.25)", tokens, 64);
+	int ret = vm_parse(ctx, "2 + lerp(4,8,0.25)", tokens, 64);
 	return assertEquals(ctx, tokens, ret, 7.0f);
 }
 
 int test_abs_function(vm_context* ctx) {
 	vm_token tokens[64];
-	uint16_t ret = vm_parse(ctx, "2 + abs(-2)", tokens, 64);
+	int ret = vm_parse(ctx, "2 + abs(-2)", tokens, 64);
 	return assertEquals(ctx, tokens, ret, 4.0f);
 }
 
 int test_variable(vm_context* ctx) {
 	vm_add_variable(ctx, "TEST", 4.0f);
 	vm_token tokens[64];
-	uint16_t ret = vm_parse(ctx, "2 + 4 + TEST", tokens, 64);
+	int ret = vm_parse(ctx, "2 + 4 + TEST", tokens, 64);
 	return assertEquals(ctx, tokens, ret, 10.0f);
 }
 
 int test_unknown_variable(vm_context* ctx) {
 	vm_add_variable(ctx, "DUMMY", 4.0f);
 	vm_token tokens[64];
-	uint16_t ret = vm_parse(ctx, "2 + 4 + TEST", tokens, 64);
+	int ret = vm_parse(ctx, "2 + 4 + TEST", tokens, 64);
 	return assertEquals(ctx, tokens, ret, 6.0f);
 }
 
 int test_basic_expression(vm_context* ctx) {
 	vm_token tokens[64];
-	uint16_t ret = vm_parse(ctx, "10 + ( 4 * 3 + 8 / 2)", tokens, 64);
+	int ret = vm_parse(ctx, "10 + ( 4 * 3 + 8 / 2)", tokens, 64);
 	return assertEquals(ctx, tokens, ret, 26.0f);
 }
 
