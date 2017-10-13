@@ -44,6 +44,12 @@ int test_lerp_function(vm_context* ctx) {
 	return assertEquals(ctx, tokens, ret, 7.0f);
 }
 
+int test_pow_function(vm_context* ctx) {
+	vm_token tokens[64];
+	int ret = vm_parse(ctx, "2 + pow((2+2),2)", tokens, 64);
+	return assertEquals(ctx, tokens, ret, 18.0f);
+}
+
 int test_abs_function(vm_context* ctx) {
 	vm_token tokens[64];
 	int ret = vm_parse(ctx, "2 + abs(-2)", tokens, 64);
@@ -87,6 +93,7 @@ int main() {
 	run_test(test_basic_expression, "test_basic_expression");
 	run_test(test_add_function, "test_add_function");
 	run_test(test_lerp_function, "test_lerp_function");
+	run_test(test_pow_function, "test_pow_function");
 	run_test(test_abs_function, "test_abs_function");
 	run_test(test_variable, "test_variable");
 	run_test(test_unknown_variable, "test_unknown_variable");

@@ -258,12 +258,22 @@ static void vm_div(vm_stack* stack) {
 	VM_PUSH(stack, b / a);
 }
 
+static void vm_pow(vm_stack* stack) {
+	float a = VM_POP(stack);
+	float b = VM_POP(stack);
+	VM_PUSH(stack, pow(b,a));
+}
+
 static void vm_sin(vm_stack* stack) {
 	VM_PUSH(stack, sin(VM_POP(stack)));
 }
 
 static void vm_cos(vm_stack* stack) {
 	VM_PUSH(stack, cos(VM_POP(stack)));
+}
+
+static void vm_tan(vm_stack* stack) {
+	VM_PUSH(stack, tan(VM_POP(stack)));
 }
 
 static void vm_abs(vm_stack* stack) {
@@ -295,6 +305,9 @@ DSDEF vm_context* vm_create_context() {
 	vm_add_function(ctx, "cos", vm_cos, 17, 1);
 	vm_add_function(ctx, "abs", vm_abs, 17, 1);
 	vm_add_function(ctx, "lerp", vm_lerp, 17, 1);
+	vm_add_function(ctx, "pow", vm_pow, 17, 2);
+	vm_add_function(ctx, "exp", vm_lerp, 17, 1);
+	vm_add_function(ctx, "tan", vm_tan, 17, 1);
 	return ctx;
 }
 
