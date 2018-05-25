@@ -401,6 +401,10 @@ static vm_token vm__token_for_identifier(vm_context* ctx, const char *identifier
 	}
 }
 
+static vm_token vm__token_for_identifier2(vm_context* ctx, const char *identifier) {
+	return vm__token_for_identifier(ctx, identifier, strlen(identifier));
+}
+
 // ------------------------------------------------------------------
 // internal method to check wether there is a known function
 // ------------------------------------------------------------------
@@ -491,7 +495,7 @@ vm_token vm__create_token_with_value(vm_token_type type, float value) {
 // parse
 // ------------------------------------------------------------------
 DSDEF int vm_parse(vm_context* ctx, const char * source, vm_token * byteCode, int capacity) {
-	int binary = 1;
+	int binary = 0;
 	const char* p = source;
 	unsigned num_tokens = 0;
 	unsigned overflow_tokens = 0;
@@ -503,22 +507,22 @@ DSDEF int vm_parse(vm_context* ctx, const char * source, vm_token * byteCode, in
 			char *out;
 			token = vm__create_token_with_value(TOK_NUMBER, vm__strtof(p, &out));
 			p = out;
-			binary = 0;
+			binary = 1;
 		}
 		else if ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p == '_')) {
 			const char *identifier = p;
 			while ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p == '_') || (*p >= '0' && *p <= '9'))
 				p++;
 			token = vm__token_for_identifier(ctx, identifier, p - identifier);
-			binary = 0;
+			binary = 1;
 		}
 		else {
 			switch (*p) {
-			case '(': token = vm__create_token(TOK_LEFT_PARENTHESIS); binary = 1; break;
-				case ')': token = vm__create_token(TOK_RIGHT_PARENTHESIS); binary = 0; break;
+				case '(': token = vm__create_token(TOK_LEFT_PARENTHESIS); binary = 0; break;
+				case ')': token = vm__create_token(TOK_RIGHT_PARENTHESIS); binary = 1; break;
 				case ' ': case '\t': case '\n': case '\r': break;
-				case '-': token = vm__token_for_identifier(ctx, binary == 0 ? "-" : "u-", 1 + binary); printf("found - \n"); break;
-				case '+': token = vm__token_for_identifier(ctx, binary == 0 ? "+" : "u+", 1 + binary); binary = 1; break;
+				case '-': token = vm__token_for_identifier2(ctx, binary == 1 ? "-" : "u-"); binary = 0; break;
+				case '+': token = vm__token_for_identifier2(ctx, binary == 1 ? "+" : "u+"); binary = 0; break;
 				default: {
 					char s1[2] = { *p,0 };
 					char s2[3] = { *p, *(p + 1), 0 };

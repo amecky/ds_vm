@@ -17,7 +17,7 @@ int assertEquals(vm_context* ctx, vm_token* tokens, int num, float expected) {
 		if (d < 0.0f) {
 			d *= -1.0f;
 		}
-		if (d > 0.0001f) {
+		if (d > 0.01f) {
 			printf("Error: expected: %g but got %g\n", expected, r);
 			return 0;
 		}
@@ -80,8 +80,7 @@ int test_basic_unary_expression(vm_context* ctx) {
 	vm_add_variable(ctx, "TIMER", 4.0f);
 	vm_token tokens[64];
 	int ret = vm_parse(ctx, "15.0 * cos(TIMER * -6.0) + 240.0", tokens, 64);
-	vm_debug(ctx, tokens, ret);
-	return assertEquals(ctx, tokens, ret, 26.0f);
+	return assertEquals(ctx, tokens, ret, 246.363f);
 }
 
 void run_test(testFunction func, const char* method) {
@@ -104,6 +103,6 @@ int main() {
 	run_test(test_pow_function, "test_pow_function");
 	run_test(test_abs_function, "test_abs_function");
 	run_test(test_variable, "test_variable");
-	run_test(test_unknown_variable, "test_unknown_variable");
 	run_test(test_basic_unary_expression, "test_basic_unary_expression");
+	run_test(test_unknown_variable, "test_unknown_variable");	
 }
