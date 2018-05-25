@@ -76,6 +76,14 @@ int test_basic_expression(vm_context* ctx) {
 	return assertEquals(ctx, tokens, ret, 26.0f);
 }
 
+int test_basic_unary_expression(vm_context* ctx) {
+	vm_add_variable(ctx, "TIMER", 4.0f);
+	vm_token tokens[64];
+	int ret = vm_parse(ctx, "15.0 * cos(TIMER * -6.0) + 240.0", tokens, 64);
+	vm_debug(ctx, tokens, ret);
+	return assertEquals(ctx, tokens, ret, 26.0f);
+}
+
 void run_test(testFunction func, const char* method) {
 	printf("executing '%s'\n", method);
 	vm_context* ctx = vm_create_context();
@@ -97,4 +105,5 @@ int main() {
 	run_test(test_abs_function, "test_abs_function");
 	run_test(test_variable, "test_variable");
 	run_test(test_unknown_variable, "test_unknown_variable");
+	run_test(test_basic_unary_expression, "test_basic_unary_expression");
 }
